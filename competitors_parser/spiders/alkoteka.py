@@ -1,27 +1,12 @@
 import json
-from collections import deque
+import copy
+from datetime import datetime
 from typing import Iterator, Dict, Any, List
 import time
 from scrapy import Request
 from scrapy.http import Response
 
 from .base import BaseCompetitorSpider
-
-WEB_URL_CAT = 'https://alkoteka.com/catalog/slaboalkogolnye-napitki-2'
-
-WEB_URL_PROD = 'https://alkoteka.com/product/pivo-1/caringer-shvarc-bir_29294'
-
-API_URL_CAT = (
-    'https://alkoteka.com/web-api/v1/product?'
-    'city_uuid=4a70f9e0-46ae-11e7-83ff-00155d026416&'
-    'page=1&per_page=20&'
-    'root_category_slug=slaboalkogolnye-napitki-2'
-)
-API_URL_PROD = (
-    'https://alkoteka.com/web-api/v1/product/'
-    'caringer-shvarc-bir_29294?'
-    'city_uuid=4a70f9e0-46ae-11e7-83ff-00155d026416'
-)
 
 
 class AlkotekaSpider(BaseCompetitorSpider):
@@ -31,6 +16,7 @@ class AlkotekaSpider(BaseCompetitorSpider):
     start_urls = [
         'https://alkoteka.com/catalog/slaboalkogolnye-napitki-2',
         'https://alkoteka.com/catalog/krepkiy-alkogol',
+        # TODO раскомментриовать в конечном варианте
     ]
 
     # API URL шаблоны
@@ -41,7 +27,8 @@ class AlkotekaSpider(BaseCompetitorSpider):
     BASE_API_CITY_UUID = '?city_uuid=4a70f9e0-46ae-11e7-83ff-00155d026416'
     # 1стр, 20 на стр
     BASE_API_PAGE_BEGIN = '&page='
-    BASE_API_PAGE_END = '&per_page=20&'
+    BASE_API_PAGE_END = '&per_page=5&'
+    # TODO исправить в конечном вариатне
     PAGE = 1
     PAGES = {}
     BASE_API_URL_CAT = (
@@ -144,6 +131,7 @@ class AlkotekaSpider(BaseCompetitorSpider):
             self.logger.error(f'Ошибка при обработке списка товаров: {str(e)}')
 
         more_pages = result.get('meta', {})
+        more_pages = False  # TODO удалить в конечном варианте
         if more_pages['has_more_pages']:
             self.PAGES[cat_slug] += 1
             print(f'has_more_pages, follow next page {self.PAGES[cat_slug]}')
@@ -174,10 +162,11 @@ class AlkotekaSpider(BaseCompetitorSpider):
             result = json.loads(response.body)
             product = result.get('results', {})
             product_id = product['uuid']
-            # print(product_id)
             product_title = product.get('name', '')
+            print(product_title)
             main_price = product.get('price', '')
-
+            prev_price = product.get('prev_price', '')
+            category = product['category']['parent']['name']
             # Проверяем, не обрабатывали ли мы уже этот товар
             if product_id in self.processed_ids:
                 self.logger.info(
@@ -192,32 +181,46 @@ class AlkotekaSpider(BaseCompetitorSpider):
 
             # Формирование корректного URL для товара
             product_url = f'{self.BASE_URL_PROD}{subcategory_slug}/{slug}'
-
+            print(product_url)
             # Получаем основную единицу измерения товара
-            filter_labels = product.get('filter_labels', [])
-            main_unit = filter_labels[0].get('title', 'шт')
+            # filter_labels = product.get('filter_labels', [])
+            # main_unit = filter_labels[0].get('title', 'шт')
 
             # Получаем информацию о складах
-            if self.BY_STOCKS:
-                stocks = self._get_normalized_stocks(product)
+            stocks = {}
+            stocks['count'] = product.get('quantity_total', '')
+            if stocks['count']:
+                stocks['in_stock'] = True
             else:
-                stocks = []
-                amount = product.get('quantity_total', '')
-                stocks.append({
-                    'stock': "Краснодар (Итого)",
-                    'quantity': amount,
-                    'price': main_price
-                })
-
+                stocks['count']
+                stocks['in_stock'] = False
+            # print(stocks)
+            assets = {}
+            assets['main_image'] = product.get('image_url', '')
+            assets['set_images'] = [assets['main_image'],]
+            assets['view360'] = []
+            assets['video'] = []
+            # print(assets)
+            now = datetime.now()
+            timestamp = int(now.timestamp())
+            print('ts =', timestamp)
+            marketing_tags = []
+            price_data = self._get_prices(prev_price, main_price)
+            mdata = self._get_mdata(product)
+            brand = mdata.get('Бренд', '')
+#            print(brand)
             yield {
-                'category': cat,
-                'product_code': f'{product_id}',
-                'name': product_title,
-                'price': main_price,
-                'stocks': stocks,
-                'unit': main_unit,
-                'currency': 'RUB',
+                'timestamp': timestamp,
+                'RPC': f'{product_id}',
                 'url': product_url,
+                'title': product_title,
+                'marketing_tags': marketing_tags,
+                'brand': brand,
+                'section': category,
+                'price_data': price_data,
+                'stocks': stocks,
+                'assets': assets,
+                'metadata': mdata,
             }
             time.sleep(0.5)
 
@@ -226,10 +229,54 @@ class AlkotekaSpider(BaseCompetitorSpider):
         except Exception as e:
             self.logger.error(f'Ошибка при обработке товара: {str(e)}')
 
+    def _get_mdata(
+        self,
+        product: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        mdata = {}
+        descr_blocks = product.get('description_blocks', {})
+        for item in descr_blocks:
+            values = item.get('values', [])
+            if len(values):
+                key = copy.deepcopy(item['title'])
+                value = (item['values'][0]['name'])
+                mdata.update({key: value})
+        text_bloks = product.get('text_blocks', {})
+        for item in text_bloks:
+            if item['title'] == 'Описание':
+                mdata['__description'] = item['content']
+            else:
+                mdata[item['title']] = item['content']
+        return mdata
+
+    def _get_prices(
+        self,
+        original: str,
+        current: str,
+    ) -> List[Dict[str, Any]]:
+        """current, "original, sale_tag = Скидка {discount_percentage}%"""
+        result = []
+        if not original:
+            original = current = float(current)
+            discount_percentage = ''
+        elif not current:
+            # original = current = float(original) # в тз нет ответа
+            original = current = discount_percentage = ''
+        else:
+            original = float(original)
+            current = float(current)
+            discount_percentage = round((original - current)/original*100, 2)
+        result.append({
+            'original': original,
+            'current': current,
+            'discount_percentage': discount_percentage,
+        })
+        return result[0]
+
     def _get_normalized_stocks(
-            self,
-            product: Dict[str, Any]
-            ) -> List[Dict[str, Any]]:
+        self,
+        product: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """
         Нормализация данных о складах с разделением по единицам измерения.
         """

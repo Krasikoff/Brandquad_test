@@ -14,18 +14,18 @@ class CSVExporter(BaseExporter):
         self.files[spider] = open(filename, 'w', newline='', encoding='utf-8')
 
         fieldnames = [
-            'category',
-            'product_code',
-            'name',
+            'timestamp',
+            'RPC',
+            'url',
+            'title',
+            'marketing_tags',
+            'brand',
+            'section',
+            'price_data',
             'price',
             'stocks',
-            'unit',
-            'currency',
-            'weight',
-            'length',
-            'width',
-            'height',
-            'url'
+            'assets',
+            'metadata',
         ]
 
         self.exporters[spider] = csv.DictWriter(
@@ -51,20 +51,20 @@ class CSVExporter(BaseExporter):
     def _format_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """Форматирование item для CSV с сохранением структуры складов."""
         csv_item = {
-            'category': item.get('category', ''),
-            'product_code': item.get('product_code', ''),
-            'name': item.get('name', ''),
-            'price': item.get('price', 0.0),
-            'currency': item.get('currency', 'RUB'),
-            'unit': self._format_unit(item.get('unit', 'шт')),
-            'weight': item.get('weight', ''),
-            'length': item.get('length', ''),
-            'width': item.get('width', ''),
-            'height': item.get('height', ''),
-            'url': item.get('url', '')
+            'timestamp': item.get('timestamp', ''),
+            'RPC': item.get('RPC', ''),
+            'url': item.get('url', ''),
+            'title': item.get('title', ''),
+            'marketing_tags': item.get('marketing_tags', ''),
+            'brand': item.get('brand', ''),
+            'section': item.get('section', ''),
+            'price_data': item.get('price_data', ''),
+            'stocks':  item.get('stocks', ''),
+            'assets':  item.get('assets', ''),
+            'metadata': item.get('metadata', ''),
         }
 
-        stocks = item.get('stocks', [])
+        stocks = item.get('stocks', {})
         if stocks:
             csv_item['stocks'] = json.dumps(stocks, ensure_ascii=False)
         else:
