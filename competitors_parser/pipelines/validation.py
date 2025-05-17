@@ -10,7 +10,7 @@ class ValidationPipeline:
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         # Обязательные поля для каждого товара согласно ТЗ
-        self.required_fields = ['product_code', 'name']
+        self.required_fields = ['RPC', 'title']
         # Дополнительное обязательное поле price проверяется отдельно
 
     def process_item(self, item: Dict[str, Any], spider) -> Dict[str, Any]:
@@ -23,26 +23,24 @@ class ValidationPipeline:
                 raise DropItem(msg)
 
         # Специальная проверка поля price
-        price = item.get('price')
-        if price is None:  # Только None считается отсутствующим
-            msg = 'Missing required field: price'
+        price_data = item.get('price_data')
+        if price_data is None:  # Только None считается отсутствующим
+            msg = 'Missing required field: price_data'
             self.logger.warning(msg)
             raise DropItem(msg)
 
         # Стандартизируем структуру
         normalized_item = {
-            'category': self._get_str_value(item, 'category', ''),
-            'product_code': self._get_str_value(item, 'product_code', ''),
-            'name': self._get_str_value(item, 'name', ''),
-            'price': self._get_float_value(item, 'price', 0.0),
-            'stocks': self._normalize_stocks(item),
-            'unit': self._normalize_unit(item),
-            'currency': self._get_str_value(item, 'currency', 'RUB'),
+            'timestamp': self._get_int_value(item, 'timestamp', ''),
+            'RPC': self._get_str_value(item, 'RPC', ''),
             'url': self._get_str_value(item, 'url', ''),
-            'weight': self._get_str_value(item, 'weight', None),
-            'length': self._get_str_value(item, 'length', None),
-            'width': self._get_str_value(item, 'width', None),
-            'height': self._get_str_value(item, 'height', None),
+            'title': self._get_str_value(item, 'title', ''),
+            'brand': self._get_str_value(item, 'brand', ''),
+            'section': self._get_str_value(item, 'section', ''),
+            'price_data': self._normalize_price_data(item),
+            'stocks': self._normalize_stocks_dict(item),
+            'assets': self._normalize_assets_dict(item),
+            'metadata': self._normalize_metadata_dict(item),
         }
 
         return normalized_item
@@ -52,7 +50,7 @@ class ValidationPipeline:
             item: Dict[str, Any],
             key: str,
             default: Optional[str] = ''
-            ) -> Optional[str]:
+    ) -> Optional[str]:
         """Получение строкового значения."""
         value = item.get(key, default)
         if value is None:
@@ -64,7 +62,7 @@ class ValidationPipeline:
             item: Dict[str, Any],
             key: str,
             default: float = 0.0
-            ) -> float:
+    ) -> float:
         """Получение числового значения как float."""
         value = item.get(key, default)
         if value is None:
@@ -77,7 +75,7 @@ class ValidationPipeline:
         except (ValueError, TypeError):
             self.logger.warning(
                 f'Invalid value for {key}: {value}, using default {default}'
-                )
+            )
             return default
 
     def _normalize_stocks(self, item: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -86,7 +84,7 @@ class ValidationPipeline:
         if 'stocks' in item and isinstance(item['stocks'], list):
             return [
                 self._normalize_stock_item(stock) for stock in item['stocks']
-                ]
+            ]
 
         # Если есть поля stock и city - преобразуем в формат stocks
         if 'stock' in item or 'city' in item:
@@ -119,12 +117,64 @@ class ValidationPipeline:
             'price': self._get_float_value(stock, 'price', 0.0)
         }
 
+    def _normalize_metadata_dict(
+            self, item: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Нормализация отдельной записи о складе."""
+        metadata = item.get('metadata')
+        if not metadata:
+            return 'Validation error'
+        # Если уже в виде списка, возвращаем как есть
+        if isinstance(metadata, dict):
+            return metadata
+        # Иначе возвращаем как строку
+        return str(metadata).strip()
+
+    def _normalize_assets_dict(
+            self, item: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Нормализация отдельной записи о складе."""
+        assets = item.get('assets')
+        if not assets:
+            return 'Validation error'
+        # Если уже в виде списка, возвращаем как есть
+        if isinstance(assets, dict):
+            return assets
+        # Иначе возвращаем как строку
+        return str(assets).strip()
+
+    def _normalize_price_data(
+            self, item: Dict[str, Any]
+    ) -> Dict[float, Any]:
+        """Нормализация отдельной записи о складе."""
+        price_data = item.get('price_data')
+        if not price_data:
+            return 'Validation error'
+        # Если уже в виде списка, возвращаем как есть
+        if isinstance(price_data, dict):
+            return price_data
+        # Иначе возвращаем как строку
+        return str(price_data).strip()
+
+    def _normalize_stocks_dict(
+            self, item: Dict[int, Any]
+    ) -> Dict[int, bool]:
+        """Нормализация отдельной записи о складе."""
+        stocks = item.get('stocks')
+        if not stocks:
+            return 'Validation error'
+        # Если уже в виде списка, возвращаем как есть
+        if isinstance(stocks, dict):
+            return stocks
+        # Иначе возвращаем как строку
+        return str(stocks).strip()
+
     def _get_int_value(
             self,
             item: Dict[str, Any],
             key: str,
             default: int = 0
-            ) -> int:
+    ) -> int:
         """Получение числового значения как int."""
         try:
             value = item.get(key, default)
@@ -134,7 +184,7 @@ class ValidationPipeline:
         except (ValueError, TypeError):
             self.logger.warning(
                 f'Invalid value for {key}: {value}, using default {default}'
-                )
+            )
             return default
 
     def _normalize_unit(self, item: Dict[str, Any]) -> Union[str, List[str]]:

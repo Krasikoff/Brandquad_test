@@ -17,18 +17,17 @@ class JSONExporter(BaseExporter):
         """Обработка и сохранение item для последующей записи в JSON."""
         try:
             ordered_item = OrderedDict()
-            ordered_item['category'] = item.get('category', '')
-            ordered_item['product_code'] = item.get('product_code', '')
-            ordered_item['name'] = item.get('name', '')
-            ordered_item['price'] = item.get('price', 0.0)
-            ordered_item['stocks'] = item.get('stocks', [])
-            ordered_item['unit'] = item.get('unit', '')
-            ordered_item['currency'] = item.get('currency', 'RUB')
-            ordered_item['weight'] = item.get('weight', None)
-            ordered_item['length'] = item.get('length', None)
-            ordered_item['width'] = item.get('width', None)
-            ordered_item['height'] = item.get('height', None)
+            ordered_item['timestamp'] = item.get('timestamp', '')
+            ordered_item['RPC'] = item.get('RPC', '')
             ordered_item['url'] = item.get('url', '')
+            ordered_item['title'] = item.get('title', '')
+            ordered_item['marketing_tags'] = item.get('marketing_tags', [])
+            ordered_item['brand'] = item.get('brand', '')
+            ordered_item['section'] = item.get('section', '')
+            ordered_item['price_data'] = item.get('price_data', [])
+            ordered_item['stocks'] = item.get('stocks', {})
+            ordered_item['assets'] = item.get('assets', {})
+            ordered_item['metadata'] = item.get('metadata', '')
 
             self.items.append(ordered_item)
 
