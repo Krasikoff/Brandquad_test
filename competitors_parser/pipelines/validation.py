@@ -50,7 +50,7 @@ class ValidationPipeline:
             item: Dict[str, Any],
             key: str,
             default: Optional[str] = ''
-            ) -> Optional[str]:
+    ) -> Optional[str]:
         """Получение строкового значения."""
         value = item.get(key, default)
         if value is None:
@@ -62,7 +62,7 @@ class ValidationPipeline:
             item: Dict[str, Any],
             key: str,
             default: float = 0.0
-            ) -> float:
+    ) -> float:
         """Получение числового значения как float."""
         value = item.get(key, default)
         if value is None:
@@ -75,7 +75,7 @@ class ValidationPipeline:
         except (ValueError, TypeError):
             self.logger.warning(
                 f'Invalid value for {key}: {value}, using default {default}'
-                )
+            )
             return default
 
     def _normalize_stocks(self, item: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -84,7 +84,7 @@ class ValidationPipeline:
         if 'stocks' in item and isinstance(item['stocks'], list):
             return [
                 self._normalize_stock_item(stock) for stock in item['stocks']
-                ]
+            ]
 
         # Если есть поля stock и city - преобразуем в формат stocks
         if 'stock' in item or 'city' in item:
@@ -130,7 +130,6 @@ class ValidationPipeline:
         # Иначе возвращаем как строку
         return str(metadata).strip()
 
-
     def _normalize_assets_dict(
             self, item: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -175,7 +174,7 @@ class ValidationPipeline:
             item: Dict[str, Any],
             key: str,
             default: int = 0
-            ) -> int:
+    ) -> int:
         """Получение числового значения как int."""
         try:
             value = item.get(key, default)
@@ -185,7 +184,7 @@ class ValidationPipeline:
         except (ValueError, TypeError):
             self.logger.warning(
                 f'Invalid value for {key}: {value}, using default {default}'
-                )
+            )
             return default
 
     def _normalize_unit(self, item: Dict[str, Any]) -> Union[str, List[str]]:

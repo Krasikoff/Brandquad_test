@@ -59,8 +59,8 @@ class CSVExporter(BaseExporter):
             'brand': item.get('brand', ''),
             'section': item.get('section', ''),
             'price_data': item.get('price_data', ''),
-            'stocks':  item.get('stocks', ''),
-            'assets':  item.get('assets', ''),
+            'stocks': item.get('stocks', ''),
+            'assets': item.get('assets', ''),
             'metadata': item.get('metadata', ''),
         }
 

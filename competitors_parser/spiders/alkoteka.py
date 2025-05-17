@@ -1,8 +1,9 @@
-import json
 import copy
-from datetime import datetime
-from typing import Iterator, Dict, Any, List
+import json
 import time
+from datetime import datetime
+from typing import Any, Dict, Iterator, List
+
 from scrapy import Request
 from scrapy.http import Response
 
@@ -16,7 +17,6 @@ class AlkotekaSpider(BaseCompetitorSpider):
     start_urls = [
         'https://alkoteka.com/catalog/slaboalkogolnye-napitki-2',
         'https://alkoteka.com/catalog/krepkiy-alkogol',
-        # TODO раскомментриовать в конечном варианте
     ]
 
     # API URL шаблоны
@@ -27,8 +27,7 @@ class AlkotekaSpider(BaseCompetitorSpider):
     BASE_API_CITY_UUID = '?city_uuid=4a70f9e0-46ae-11e7-83ff-00155d026416'
     # 1стр, 20 на стр
     BASE_API_PAGE_BEGIN = '&page='
-    BASE_API_PAGE_END = '&per_page=5&'
-    # TODO исправить в конечном вариатне
+    BASE_API_PAGE_END = '&per_page=20&'
     PAGE = 1
     PAGES = {}
     BASE_API_URL_CAT = (
@@ -69,8 +68,6 @@ class AlkotekaSpider(BaseCompetitorSpider):
             category_slug = category_url.replace(self.BASE_API_URL_CAT, '')
             self.PAGES[category_slug] = 1
             print(category_url)
-            print(category_name)
-            print(category_slug)
 
             yield Request(
                 url=category_url,
@@ -87,7 +84,7 @@ class AlkotekaSpider(BaseCompetitorSpider):
             response: Response,
             cat: str,
             cat_slug: str
-            ) -> Iterator[Request]:
+    ) -> Iterator[Request]:
         """Парсинг списка товаров в категории."""
         try:
             result = json.loads(response.body)
@@ -131,7 +128,7 @@ class AlkotekaSpider(BaseCompetitorSpider):
             self.logger.error(f'Ошибка при обработке списка товаров: {str(e)}')
 
         more_pages = result.get('meta', {})
-        more_pages = False  # TODO удалить в конечном варианте
+#        more_pages = False  # TODO удалить в конечном варианте
         if more_pages['has_more_pages']:
             self.PAGES[cat_slug] += 1
             print(f'has_more_pages, follow next page {self.PAGES[cat_slug]}')
@@ -156,14 +153,13 @@ class AlkotekaSpider(BaseCompetitorSpider):
             response: Response,
             cat: str,
             slug: str
-            ) -> Iterator[Dict[str, Any]]:
+    ) -> Iterator[Dict[str, Any]]:
         """Парсинг данных о товаре."""
         try:
             result = json.loads(response.body)
             product = result.get('results', {})
             product_id = product['uuid']
             product_title = product.get('name', '')
-            print(product_title)
             main_price = product.get('price', '')
             prev_price = product.get('prev_price', '')
             category = product['category']['parent']['name']
@@ -181,10 +177,8 @@ class AlkotekaSpider(BaseCompetitorSpider):
 
             # Формирование корректного URL для товара
             product_url = f'{self.BASE_URL_PROD}{subcategory_slug}/{slug}'
-            print(product_url)
-            # Получаем основную единицу измерения товара
+            # Получаем может здесь "marketing_tags"? не уверен, пока []
             # filter_labels = product.get('filter_labels', [])
-            # main_unit = filter_labels[0].get('title', 'шт')
 
             # Получаем информацию о складах
             stocks = {}
@@ -194,21 +188,17 @@ class AlkotekaSpider(BaseCompetitorSpider):
             else:
                 stocks['count']
                 stocks['in_stock'] = False
-            # print(stocks)
             assets = {}
             assets['main_image'] = product.get('image_url', '')
             assets['set_images'] = [assets['main_image'],]
             assets['view360'] = []
             assets['video'] = []
-            # print(assets)
             now = datetime.now()
             timestamp = int(now.timestamp())
-            print('ts =', timestamp)
             marketing_tags = []
             price_data = self._get_prices(prev_price, main_price)
             mdata = self._get_mdata(product)
             brand = mdata.get('Бренд', '')
-#            print(brand)
             yield {
                 'timestamp': timestamp,
                 'RPC': f'{product_id}',
@@ -265,7 +255,9 @@ class AlkotekaSpider(BaseCompetitorSpider):
         else:
             original = float(original)
             current = float(current)
-            discount_percentage = round((original - current)/original*100, 2)
+            discount_percentage = round(
+                (original - current) / original * 100, 2
+            )
         result.append({
             'original': original,
             'current': current,
@@ -288,10 +280,8 @@ class AlkotekaSpider(BaseCompetitorSpider):
         for store in stores:
             unit_title = store['title']
             amount = store['quantity']
-
             # Получаем цену для данной единицы измерения
             unit_price = store['price']
-
             # Добавляем запись для Краснодара
             result.append({
                 'stock': f"Краснодар ({unit_title})",
@@ -305,7 +295,6 @@ class AlkotekaSpider(BaseCompetitorSpider):
                 'price': self._get_price_for_unit(
                     product,
                     product.get('unit', 'шт')
-                    )
+                )
             })
-
         return result
