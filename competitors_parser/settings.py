@@ -37,9 +37,18 @@ RETRY_ENABLED = True
 RETRY_TIMES = 3
 RETRY_HTTP_CODES = [500, 502, 503, 504, 522, 524, 408, 429]
 
+# ROTATING_PROXY_LIST_PATH = '/my/path/proxies.txt'
+ROTATING_PROXY_LIST = [
+    '15.206.60.212:3128',
+    '65.2.11.52:999',
+    '47.237.107.41:82',
+]
+
 DOWNLOADER_MIDDLEWARES = {
     'scrapy.downloadermiddlewares.retry.RetryMiddleware': 550,
     'competitors_parser.middlewares.ErrorHandlerMiddleware': 560,
+    'rotating_proxies.middlewares.RotatingProxyMiddleware': 610,
+    'rotating_proxies.middlewares.BanDetectionMiddleware': 620,
 }
 
 HTTPCACHE_ENABLED = True
